@@ -62,7 +62,8 @@ export default function ProbedPage() {
 const fetchProbed = async () => {
     setIsLoading(true)
     try {
-      const res = await api.get<PaginatedResponse>("/api/probed")
+      const params = new URLSearchParams({ page: "1", limit: "1000" })
+      const res = await api.get<PaginatedResponse>(`/api/probed?${params.toString()}`)
       const resData = res.data
       const items = resData?.items || resData?.data || (Array.isArray(resData) ? resData : [])
       setAllData(Array.isArray(items) ? items : [])
@@ -148,7 +149,8 @@ const fetchProbed = async () => {
   const handleUpload = async (file: File) => {
     const formData = new FormData()
     formData.append("file", file)
-    await api.upload("/api/probed", formData)
+    formData.append("scan_type", "probed")
+    await api.upload("/api/upload", formData)
     fetchProbed()
   }
 
@@ -313,8 +315,8 @@ const fetchProbed = async () => {
             />
             <FileUploadDialog
               title="Upload Probed Hosts"
-              description="Upload a JSON file with probed hosts data."
-              accept=".json"
+              description="Upload an NDJSON file (httpx output). Each line: {&quot;input&quot;:&quot;sub.example.com&quot;,&quot;url&quot;:&quot;https://...&quot;,&quot;status_code&quot;:200,&quot;title&quot;:&quot;...&quot;,&quot;scheme&quot;:&quot;https&quot;,...}"
+              accept=".json,.jsonl,.txt"
               onUpload={handleUpload}
             />
           </>

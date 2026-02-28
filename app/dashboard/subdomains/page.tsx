@@ -44,7 +44,8 @@ export default function SubdomainsPage() {
   const fetchSubdomains = async () => {
     setIsLoading(true)
     try {
-      const res = await api.get<PaginatedResponse>("/api/subdomains")
+      const params = new URLSearchParams({ page: "1", limit: "1000" })
+      const res = await api.get<PaginatedResponse>(`/api/subdomains?${params.toString()}`)
       const resData = res.data
       const items = resData?.items || resData?.data || (Array.isArray(resData) ? resData : [])
       setAllData(Array.isArray(items) ? items : [])
@@ -105,10 +106,11 @@ export default function SubdomainsPage() {
   ) => {
     const formData = new FormData()
     formData.append("file", file)
+    formData.append("scan_type", "subdomain")
     if (extraFields?.domain_id) {
       formData.append("domain_id", extraFields.domain_id)
     }
-    await api.upload("/api/subdomains", formData)
+    await api.upload("/api/upload", formData)
     fetchSubdomains()
   }
 
@@ -218,8 +220,8 @@ export default function SubdomainsPage() {
             />
             <FileUploadDialog
               title="Upload Subdomains"
-              description="Upload a text file with one subdomain per line."
-              accept=".txt"
+              description="Upload a plain text file (one subdomain per line) or NDJSON ({&quot;name&quot;: &quot;sub.example.com&quot;})."
+              accept=".txt,.json,.jsonl"
               onUpload={handleUpload}
               extraFields={[
                 {

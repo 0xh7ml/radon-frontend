@@ -52,7 +52,8 @@ export default function VulnerabilitiesPage() {
   const fetchVulnerabilities = async () => {
     setIsLoading(true)
     try {
-      const res = await api.get<PaginatedResponse>("/api/vulns")
+      const params = new URLSearchParams({ page: "1", limit: "1000" })
+      const res = await api.get<PaginatedResponse>(`/api/vulns?${params.toString()}`)
       const resData = res.data
       const items = resData?.items || resData?.data || (Array.isArray(resData) ? resData : [])
       setAllData(Array.isArray(items) ? items : [])
@@ -114,7 +115,8 @@ export default function VulnerabilitiesPage() {
   const handleUpload = async (file: File) => {
     const formData = new FormData()
     formData.append("file", file)
-    await api.upload("/api/vulns", formData)
+    formData.append("scan_type", "vuln")
+    await api.upload("/api/upload", formData)
     fetchVulnerabilities()
   }
 
@@ -246,8 +248,8 @@ export default function VulnerabilitiesPage() {
             />
             <FileUploadDialog
               title="Upload Vulnerabilities"
-              description="Upload a JSON file with vulnerabilities data."
-              accept=".json"
+              description="Upload an NDJSON file (nuclei output). Each line: {&quot;host&quot;:&quot;sub.example.com&quot;,&quot;template_id&quot;:&quot;...&quot;,&quot;info&quot;:{&quot;name&quot;:&quot;...&quot;,&quot;severity&quot;:&quot;high&quot;},...}"
+              accept=".json,.jsonl,.txt"
               onUpload={handleUpload}
             />
           </>

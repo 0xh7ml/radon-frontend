@@ -37,7 +37,8 @@ export default function PortsPage() {
   const fetchPorts = async () => {
     setIsLoading(true)
     try {
-      const res = await api.get<Port[]>("/api/ports")
+      const params = new URLSearchParams({ page: "1", limit: "1000" })
+      const res = await api.get<Port[]>(`/api/ports?${params.toString()}`)
       setAllData(Array.isArray(res.data) ? res.data : [])
     } catch (error: any) {
       // Only show error toast if it's not a "no data" situation
@@ -84,7 +85,8 @@ export default function PortsPage() {
   const handleUpload = async (file: File) => {
     const formData = new FormData()
     formData.append("file", file)
-    await api.upload("/api/ports", formData)
+    formData.append("scan_type", "port")
+    await api.upload("/api/upload", formData)
     fetchPorts()
   }
 
@@ -174,8 +176,8 @@ export default function PortsPage() {
             />
             <FileUploadDialog
               title="Upload Ports"
-              description="Upload a CSV file with format: host,ip,port,protocol,tls"
-              accept=".csv"
+              description="Upload an NDJSON file (naabu output). Each line: {&quot;host&quot;:&quot;sub.example.com&quot;,&quot;ip&quot;:&quot;1.2.3.4&quot;,&quot;port&quot;:443,&quot;protocol&quot;:&quot;tcp&quot;,&quot;tls&quot;:true}"
+              accept=".json,.jsonl,.txt"
               onUpload={handleUpload}
             />
           </>

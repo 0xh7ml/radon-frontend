@@ -3,6 +3,7 @@
 import {
   IconBug,
   IconPlugConnected,
+  IconRadar,
   IconSubtask,
   IconWorld,
 } from "@tabler/icons-react"
@@ -18,6 +19,7 @@ interface StatsData {
   total_domains?: number
   total_subdomains?: number
   total_ports?: number
+  total_probed_hosts?: number
   total_vulnerabilities?: number
   vulnerability_breakdown?: Record<string, number>
   [key: string]: unknown
@@ -41,6 +43,11 @@ export function SectionCards({ stats }: { stats: StatsData | null }) {
       icon: IconPlugConnected,
     },
     {
+      title: "Probed Hosts",
+      value: stats?.total_probed_hosts ?? 0,
+      icon: IconRadar,
+    },
+    {
       title: "Vulnerabilities",
       value: stats?.total_vulnerabilities ?? 0,
       icon: IconBug,
@@ -51,7 +58,7 @@ export function SectionCards({ stats }: { stats: StatsData | null }) {
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-4 px-4 sm:grid-cols-2 lg:grid-cols-4 lg:px-6">
+    <div className="grid grid-cols-1 gap-4 px-4 sm:grid-cols-2 lg:grid-cols-5 lg:px-6">
       {cards.map((card) => (
         <Card key={card.title}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">

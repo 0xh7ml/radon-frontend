@@ -63,7 +63,8 @@ export default function DomainsPage() {
   const fetchDomains = async () => {
     setIsLoading(true)
     try {
-      const res = await api.get<Domain[]>("/api/domains")
+      const params = new URLSearchParams({ page: "1", limit: "1000", include_stats: "true" })
+      const res = await api.get<Domain[]>(`/api/domains?${params.toString()}`)
       setAllData(Array.isArray(res.data) ? res.data : [])
     } catch (error: any) {
       // Only show error toast if it's not a "no data" situation
@@ -150,7 +151,8 @@ export default function DomainsPage() {
   const handleUpload = async (file: File) => {
     const formData = new FormData()
     formData.append("file", file)
-    await api.upload("/api/domains", formData)
+    formData.append("scan_type", "domain")
+    await api.upload("/api/upload", formData)
     fetchDomains()
   }
 
