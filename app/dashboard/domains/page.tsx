@@ -10,7 +10,6 @@ import {
 } from "@tabler/icons-react"
 import { toast } from "@/lib/sweetalert"
 
-import { api } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -64,11 +63,36 @@ export default function DomainsPage() {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ page: "1", limit: "1000", include_stats: "true" })
-      const res = await api.get<Domain[]>(`/api/domains?${params.toString()}`)
-      setAllData(Array.isArray(res.data) ? res.data : [])
+      const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/domains?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("jwt_token")
+            localStorage.removeItem("jwt_user")
+            window.location.href = "/signin"
+          }
+          return
+        }
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      console.log("Domains API response:", result)
+      
+      // Handle different response structures
+      const items = result.data || result.items || (Array.isArray(result) ? result : [])
+      setAllData(Array.isArray(items) ? items : [])
     } catch (error: any) {
+      console.error("Domains fetch error:", error)
       // Only show error toast if it's not a "no data" situation
-      if (error?.response?.status !== 404) {
+      if (error?.message && !error.message.includes('404')) {
         toast.error("Failed to load domains")
       }
     } finally {
@@ -116,10 +140,31 @@ export default function DomainsPage() {
 
   const handleDelete = async (id: number) => {
     try {
-      await api.delete(`/api/domains/${id}`)
+      const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/domains/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("jwt_token")
+            localStorage.removeItem("jwt_user")
+            window.location.href = "/signin"
+          }
+          return
+        }
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
       toast.success("Domain deleted")
       fetchDomains()
-    } catch {
+    } catch (error) {
+      console.error("Domain delete error:", error)
       toast.error("Failed to delete domain")
     }
   }
@@ -134,14 +179,36 @@ export default function DomainsPage() {
     if (!editDomain) return
     setIsSaving(true)
     try {
-      await api.put(`/api/domains/${editDomain.id}`, {
-        name: editName,
-        is_scanned: editScanned,
+      const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/domains/${editDomain.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: editName,
+          is_scanned: editScanned,
+        })
       })
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("jwt_token")
+            localStorage.removeItem("jwt_user")
+            window.location.href = "/signin"
+          }
+          return
+        }
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
       toast.success("Domain updated")
       setEditDomain(null)
       fetchDomains()
-    } catch {
+    } catch (error) {
+      console.error("Domain update error:", error)
       toast.error("Failed to update domain")
     } finally {
       setIsSaving(false)
@@ -152,8 +219,43 @@ export default function DomainsPage() {
     const formData = new FormData()
     formData.append("file", file)
     formData.append("scan_type", "domain")
-    await api.upload("/api/upload", formData)
-    fetchDomains()
+    
+    const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("jwt_token")
+          localStorage.removeItem("jwt_user")
+          window.location.href = "/signin"
+        }
+        return
+      }
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Upload failed with status ${response.status}`)
+    }
+    
+    const result = await response.json()
+    console.log("Upload result:", result)
+    
+    // Show success message with job ID
+    if (result.success && result.data?.jobId) {
+      toast.success(`Domain upload queued successfully! Job ID: ${result.data.jobId.slice(0, 8)}...`)
+    } else {
+      toast.success("Domain upload successful!")
+    }
+    
+    // Refresh data after a short delay to allow processing
+    setTimeout(() => {
+      fetchDomains()
+    }, 1000)
   }
 
   const formatDate = (dateString: string) => {

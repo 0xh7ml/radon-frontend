@@ -5,7 +5,6 @@ import { ColumnDef } from "@tanstack/react-table"
 import { IconLoader2 } from "@tabler/icons-react"
 import { toast } from "@/lib/sweetalert"
 
-import { api } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -53,13 +52,36 @@ export default function VulnerabilitiesPage() {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ page: "1", limit: "1000" })
-      const res = await api.get<PaginatedResponse>(`/api/vulns?${params.toString()}`)
-      const resData = res.data
-      const items = resData?.items || resData?.data || (Array.isArray(resData) ? resData : [])
+      const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/vulns?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("jwt_token")
+            localStorage.removeItem("jwt_user")
+            window.location.href = "/signin"
+          }
+          return
+        }
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      console.log("Vulnerabilities API response:", result)
+      
+      // Handle different response structures
+      const items = result.data || result.items || (Array.isArray(result) ? result : [])
       setAllData(Array.isArray(items) ? items : [])
     } catch (error: any) {
+      console.error("Vulnerabilities fetch error:", error)
       // Only show error toast if it's not a "no data" situation
-      if (error?.response?.status !== 404) {
+      if (error?.message && !error.message.includes('404')) {
         toast.error("Failed to load vulnerabilities")
       }
     } finally {
@@ -116,8 +138,40 @@ export default function VulnerabilitiesPage() {
     const formData = new FormData()
     formData.append("file", file)
     formData.append("scan_type", "vuln")
-    await api.upload("/api/upload", formData)
-    fetchVulnerabilities()
+    
+    const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("jwt_token")
+          localStorage.removeItem("jwt_user")
+          window.location.href = "/signin"
+        }
+        return
+      }
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Upload failed with status ${response.status}`)
+    }
+    
+    const result = await response.json()
+    console.log("Upload result:", result)
+    
+    // Show success message with job ID
+    if (result.success && result.data?.jobId) {
+      toast.success(`Vulnerability upload queued successfully! Job ID: ${result.data.jobId.slice(0, 8)}...`)
+    } else {
+      toast.success("Vulnerability upload successful!")
+    }
+    
+    // Note: Don't refresh immediately as processing is async
   }
 
   const columns: ColumnDef<Vulnerability>[] = [

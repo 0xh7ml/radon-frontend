@@ -5,7 +5,6 @@ import { ColumnDef } from "@tanstack/react-table"
 import { IconLoader2 } from "@tabler/icons-react"
 import { toast } from "@/lib/sweetalert"
 
-import { api } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
@@ -20,12 +19,21 @@ import { FileUploadDialog } from "@/components/file-upload-dialog"
 
 interface ProbedHost {
   id: number
-  host: string
-  status_code: number
-  scheme: string
+  input: string
+  domain: string
+  url: string
+  port: number
   title?: string
-  content_length?: number
+  scheme: string
+  webserver?: string
+  contentType?: string
   tech?: string[]
+  statusCode: number
+  contentLength?: number
+  cdnName?: string
+  cdnType?: string
+  createdAt: string
+  updatedAt: string
 }
 
 interface PaginatedResponse {
@@ -63,13 +71,36 @@ const fetchProbed = async () => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ page: "1", limit: "1000" })
-      const res = await api.get<PaginatedResponse>(`/api/probed?${params.toString()}`)
-      const resData = res.data
-      const items = resData?.items || resData?.data || (Array.isArray(resData) ? resData : [])
+      const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/probed?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("jwt_token")
+            localStorage.removeItem("jwt_user")
+            window.location.href = "/signin"
+          }
+          return
+        }
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      console.log("Probed API response:", result)
+      
+      // Handle different response structures
+      const items = result.data || result.items || (Array.isArray(result) ? result : [])
       setAllData(Array.isArray(items) ? items : [])
     } catch (error: any) {
+      console.error("Probed fetch error:", error)
       // Only show error toast if it's not a "no data" situation
-      if (error?.response?.status !== 404) {
+      if (error?.message && !error.message.includes('404')) {
         toast.error("Failed to load probed hosts")
       }
     } finally {
@@ -88,7 +119,7 @@ const fetchProbed = async () => {
     // Apply filters
     if (statusFilter) {
       filtered = filtered.filter(host => 
-        String(host.status_code).includes(statusFilter)
+        String(host.statusCode).includes(statusFilter)
       )
     }
     
@@ -104,7 +135,7 @@ const fetchProbed = async () => {
     
     if (webserverFilter) {
       filtered = filtered.filter(host => 
-        host.title?.toLowerCase().includes(webserverFilter.toLowerCase()) // Assuming webserver info is in title or similar field
+        host.webserver?.toLowerCase().includes(webserverFilter.toLowerCase())
       )
     }
     
@@ -116,25 +147,25 @@ const fetchProbed = async () => {
     
     if (cdnNameFilter) {
       filtered = filtered.filter(host => 
-        host.host.toLowerCase().includes(cdnNameFilter.toLowerCase()) // Assuming CDN info might be in host
+        host.cdnName?.toLowerCase().includes(cdnNameFilter.toLowerCase())
       )
     }
     
     if (cdnTypeFilter) {
       filtered = filtered.filter(host => 
-        host.host.toLowerCase().includes(cdnTypeFilter.toLowerCase())
+        host.cdnType?.toLowerCase().includes(cdnTypeFilter.toLowerCase())
       )
     }
     
     if (inputFilter) {
       filtered = filtered.filter(host => 
-        host.host.toLowerCase().includes(inputFilter.toLowerCase())
+        host.input.toLowerCase().includes(inputFilter.toLowerCase())
       )
     }
     
     if (inputDomainFilter) {
       filtered = filtered.filter(host => 
-        host.host.toLowerCase().includes(inputDomainFilter.toLowerCase())
+        host.domain.toLowerCase().includes(inputDomainFilter.toLowerCase())
       )
     }
     
@@ -150,27 +181,59 @@ const fetchProbed = async () => {
     const formData = new FormData()
     formData.append("file", file)
     formData.append("scan_type", "probed")
-    await api.upload("/api/upload", formData)
-    fetchProbed()
+    
+    const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("jwt_token")
+          localStorage.removeItem("jwt_user")
+          window.location.href = "/signin"
+        }
+        return
+      }
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Upload failed with status ${response.status}`)
+    }
+    
+    const result = await response.json()
+    console.log("Upload result:", result)
+    
+    // Show success message with job ID
+    if (result.success && result.data?.jobId) {
+      toast.success(`Probed hosts upload queued successfully! Job ID: ${result.data.jobId.slice(0, 8)}...`)
+    } else {
+      toast.success("Probed hosts upload successful!")
+    }
+    
+    // Note: Don't refresh immediately as processing is async
   }
 
   const columns: ColumnDef<ProbedHost>[] = [
     {
-      accessorKey: "host",
+      accessorKey: "input",
       header: "Host",
       cell: ({ row }) => (
-        <span className="font-medium">{row.original.host}</span>
+        <span className="font-medium">{row.original.input}</span>
       ),
     },
     {
-      accessorKey: "status_code",
+      accessorKey: "statusCode",
       header: "Status",
       cell: ({ row }) => (
         <Badge
           variant="outline"
-          className={statusColor(row.original.status_code)}
+          className={statusColor(row.original.statusCode)}
         >
-          {row.original.status_code}
+          {row.original.statusCode}
         </Badge>
       ),
     },
@@ -193,14 +256,43 @@ const fetchProbed = async () => {
       ),
     },
     {
-      accessorKey: "content_length",
+      accessorKey: "contentLength",
       header: "Size",
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground">
-          {row.original.content_length != null
-            ? `${row.original.content_length}`
+          {row.original.contentLength != null
+            ? `${row.original.contentLength}`
             : "-"}
         </span>
+      ),
+    },
+    {
+      accessorKey: "webserver",
+      header: "Server",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {row.original.webserver || "-"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "tech",
+      header: "Tech",
+      cell: ({ row }) => (
+        <div className="flex flex-wrap gap-1">
+          {row.original.tech?.slice(0, 2).map((t, i) => (
+            <Badge key={i} variant="outline" className="text-xs">
+              {t}
+            </Badge>
+          )) || (
+            <span className="text-xs text-muted-foreground">-</span>
+          )}
+          {row.original.tech && row.original.tech.length > 2 && (
+            <Badge variant="outline" className="text-xs">
+              +{row.original.tech.length - 2}
+            </Badge>
+          )}
+        </div>
       ),
     },
   ]
@@ -225,6 +317,15 @@ const fetchProbed = async () => {
         }}
         toolbar={
           <>
+            <Input
+              placeholder="Filter by host..."
+              className="h-8 w-40"
+              value={inputFilter}
+              onChange={(e) => {
+                setInputFilter(e.target.value)
+                setPage(1)
+              }}
+            />
             <Input
               placeholder="Filter status code..."
               className="h-8 w-32"
@@ -251,11 +352,11 @@ const fetchProbed = async () => {
               </SelectContent>
             </Select>
             <Input
-              placeholder="Filter technology..."
+              placeholder="Filter by domain..."
               className="h-8 w-36"
-              value={techFilter}
+              value={inputDomainFilter}
               onChange={(e) => {
-                setTechFilter(e.target.value)
+                setInputDomainFilter(e.target.value)
                 setPage(1)
               }}
             />
@@ -268,54 +369,9 @@ const fetchProbed = async () => {
                 setPage(1)
               }}
             />
-            <Input
-              placeholder="Filter title..."
-              className="h-8 w-32"
-              value={titleFilter}
-              onChange={(e) => {
-                setTitleFilter(e.target.value)
-                setPage(1)
-              }}
-            />
-            <Input
-              placeholder="Filter CDN name..."
-              className="h-8 w-36"
-              value={cdnNameFilter}
-              onChange={(e) => {
-                setCdnNameFilter(e.target.value)
-                setPage(1)
-              }}
-            />
-            <Input
-              placeholder="Filter CDN type..."
-              className="h-8 w-36"
-              value={cdnTypeFilter}
-              onChange={(e) => {
-                setCdnTypeFilter(e.target.value)
-                setPage(1)
-              }}
-            />
-            <Input
-              placeholder="Filter input..."
-              className="h-8 w-28"
-              value={inputFilter}
-              onChange={(e) => {
-                setInputFilter(e.target.value)
-                setPage(1)
-              }}
-            />
-            <Input
-              placeholder="Filter input domain..."
-              className="h-8 w-40"
-              value={inputDomainFilter}
-              onChange={(e) => {
-                setInputDomainFilter(e.target.value)
-                setPage(1)
-              }}
-            />
             <FileUploadDialog
               title="Upload Probed Hosts"
-              description="Upload an NDJSON file (httpx output). Each line: {&quot;input&quot;:&quot;sub.example.com&quot;,&quot;url&quot;:&quot;https://...&quot;,&quot;status_code&quot;:200,&quot;title&quot;:&quot;...&quot;,&quot;scheme&quot;:&quot;https&quot;,...}"
+              description={`Upload an NDJSON file (httpx output).\n\nExample format:\n{"input":"sub.example.com","url":"https://...","statusCode":200,"title":"...","scheme":"https"}`}
               accept=".json,.jsonl,.txt"
               onUpload={handleUpload}
             />

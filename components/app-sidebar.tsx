@@ -6,6 +6,7 @@ import {
   IconHelp,
   IconKey,
   IconLayoutDashboard,
+  IconList,
   IconPlugConnected,
   IconRadar,
   IconSettings,
@@ -56,6 +57,11 @@ const navItems = [
     title: "Vulnerabilities",
     url: "/dashboard/vulnerabilities",
     icon: IconBug,
+  },
+  {
+    title: "Jobs",
+    url: "/dashboard/jobs",
+    icon: IconList,
   },
 ]
 

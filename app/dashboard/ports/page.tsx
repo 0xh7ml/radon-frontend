@@ -5,7 +5,6 @@ import { ColumnDef } from "@tanstack/react-table"
 import { IconLoader2 } from "@tabler/icons-react"
 import { toast } from "@/lib/sweetalert"
 
-import { api } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
@@ -38,11 +37,33 @@ export default function PortsPage() {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ page: "1", limit: "1000" })
-      const res = await api.get<Port[]>(`/api/ports?${params.toString()}`)
-      setAllData(Array.isArray(res.data) ? res.data : [])
+      const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/ports?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("jwt_token")
+            localStorage.removeItem("jwt_user")
+            window.location.href = "/signin"
+          }
+          return
+        }
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      console.log("Ports API response:", result)
+      setAllData(Array.isArray(result.data) ? result.data : [])
     } catch (error: any) {
+      console.error("Ports fetch error:", error)
       // Only show error toast if it's not a "no data" situation
-      if (error?.response?.status !== 404) {
+      if (error?.message && !error.message.includes('404')) {
         toast.error("Failed to load ports")
       }
     } finally {
@@ -86,8 +107,41 @@ export default function PortsPage() {
     const formData = new FormData()
     formData.append("file", file)
     formData.append("scan_type", "port")
-    await api.upload("/api/upload", formData)
-    fetchPorts()
+    
+    const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("jwt_token")
+          localStorage.removeItem("jwt_user")
+          window.location.href = "/signin"
+        }
+        return
+      }
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Upload failed with status ${response.status}`)
+    }
+    
+    const result = await response.json()
+    console.log("Upload result:", result)
+    
+    // Show success message with job ID
+    if (result.success && result.data?.jobId) {
+      toast.success(`Port scan upload queued successfully! Job ID: ${result.data.jobId.slice(0, 8)}...`)
+    } else {
+      toast.success("Port scan upload successful!")
+    }
+    
+    // Note: Don't refresh ports immediately as processing is async
+    // The data will be available once the job completes
   }
 
   const columns: ColumnDef<Port>[] = [
@@ -176,7 +230,10 @@ export default function PortsPage() {
             />
             <FileUploadDialog
               title="Upload Ports"
-              description="Upload an NDJSON file (naabu output). Each line: {&quot;host&quot;:&quot;sub.example.com&quot;,&quot;ip&quot;:&quot;1.2.3.4&quot;,&quot;port&quot;:443,&quot;protocol&quot;:&quot;tcp&quot;,&quot;tls&quot;:true}"
+              description={`Upload an NDJSON file (naabu output).
+
+Example format:
+{"host":"sub.example.com","ip":"1.2.3.4","port":443,"protocol":"tcp","tls":true}`}
               accept=".json,.jsonl,.txt"
               onUpload={handleUpload}
             />
