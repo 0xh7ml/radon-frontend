@@ -27,8 +27,8 @@ const severityConfig: Record<
   },
 }
 
-export function SeverityBadge({ severity }: { severity: string }) {
-  const config = severityConfig[severity.toLowerCase()] || severityConfig.info
+export function SeverityBadge({ severity }: { severity: string | null | undefined }) {
+  const config = severityConfig[severity?.toLowerCase() || ''] || severityConfig.info
   return (
     <Badge variant="outline" className={cn("text-xs font-medium", config.className)}>
       {config.label}

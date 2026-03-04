@@ -19,13 +19,17 @@ import { SeverityBadge } from "@/components/severity-badge"
 
 interface Vulnerability {
   id: number
-  name: string
-  severity: string
   host: string
-  port?: number
-  template_id?: string
-  description?: string
-  matched_at?: string
+  domain: string
+  port: number
+  ip: string
+  templateId: string
+  templatePath: string
+  url: string
+  infoName: string
+  infoSeverity: string
+  createdAt: string
+  updatedAt: string
 }
 
 interface PaginatedResponse {
@@ -46,7 +50,8 @@ export default function VulnerabilitiesPage() {
   const [portFilter, setPortFilter] = React.useState("")
   const [templateIdFilter, setTemplateIdFilter] = React.useState("")
   const [hostFilter, setHostFilter] = React.useState("")
-  const [hostDomainFilter, setHostDomainFilter] = React.useState("")
+  const [domainFilter, setDomainFilter] = React.useState("")
+  const [ipFilter, setIpFilter] = React.useState("")
 
   const fetchVulnerabilities = async () => {
     setIsLoading(true)
@@ -99,7 +104,7 @@ export default function VulnerabilitiesPage() {
     
     // Apply filters
     if (severityFilter && severityFilter !== "all") {
-      filtered = filtered.filter(vuln => vuln.severity === severityFilter)
+      filtered = filtered.filter(vuln => vuln.infoSeverity === severityFilter)
     }
     
     if (portFilter) {
@@ -110,7 +115,7 @@ export default function VulnerabilitiesPage() {
     
     if (templateIdFilter) {
       filtered = filtered.filter(vuln => 
-        vuln.template_id?.toLowerCase().includes(templateIdFilter.toLowerCase())
+        vuln.templateId?.toLowerCase().includes(templateIdFilter.toLowerCase())
       )
     }
     
@@ -120,9 +125,15 @@ export default function VulnerabilitiesPage() {
       )
     }
     
-    if (hostDomainFilter) {
+    if (domainFilter) {
       filtered = filtered.filter(vuln => 
-        vuln.host.toLowerCase().includes(hostDomainFilter.toLowerCase())
+        vuln.domain.toLowerCase().includes(domainFilter.toLowerCase())
+      )
+    }
+    
+    if (ipFilter) {
+      filtered = filtered.filter(vuln => 
+        vuln.ip.toLowerCase().includes(ipFilter.toLowerCase())
       )
     }
     
@@ -132,7 +143,7 @@ export default function VulnerabilitiesPage() {
     const paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage)
     
     return { data: paginatedData, totalPages }
-  }, [allData, severityFilter, portFilter, templateIdFilter, hostFilter, hostDomainFilter, page, itemsPerPage])
+  }, [allData, severityFilter, portFilter, templateIdFilter, hostFilter, domainFilter, ipFilter, page, itemsPerPage])
 
   const handleUpload = async (file: File) => {
     const formData = new FormData()
@@ -176,24 +187,47 @@ export default function VulnerabilitiesPage() {
 
   const columns: ColumnDef<Vulnerability>[] = [
     {
-      accessorKey: "name",
-      header: "Name",
-      cell: ({ row }) => (
-        <span className="max-w-[250px] truncate font-medium">
-          {row.original.name}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "severity",
+      accessorKey: "infoSeverity",
       header: "Severity",
-      cell: ({ row }) => <SeverityBadge severity={row.original.severity} />,
+      cell: ({ row }) => <SeverityBadge severity={row.original.infoSeverity} />,
     },
     {
       accessorKey: "host",
       header: "Host",
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.host}</span>
+        <span className="text-sm max-w-[150px] md:max-w-[200px] truncate block">{row.original.host}</span>
+      ),
+    },
+    {
+      accessorKey: "domain",
+      header: "Domain",
+      cell: ({ row }) => (
+        <span className="text-sm max-w-[120px] md:max-w-[150px] truncate block text-muted-foreground">
+          {row.original.domain}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "ip",
+      header: "IP",
+      cell: ({ row }) => (
+        <span className="font-mono text-xs max-w-[100px] truncate block text-muted-foreground">
+          {row.original.ip}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "url",
+      header: "URL",
+      cell: ({ row }) => (
+        <a 
+          href={row.original.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="max-w-[180px] md:max-w-[250px] truncate text-sm text-blue-400 hover:text-blue-300 underline block"
+        >
+          {row.original.url}
+        </a>
       ),
     },
     {
@@ -206,20 +240,11 @@ export default function VulnerabilitiesPage() {
       ),
     },
     {
-      accessorKey: "template_id",
+      accessorKey: "templateId",
       header: "Template",
       cell: ({ row }) => (
-        <span className="max-w-[180px] truncate font-mono text-xs text-muted-foreground">
-          {row.original.template_id || "-"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "matched_at",
-      header: "Matched At",
-      cell: ({ row }) => (
-        <span className="max-w-[200px] truncate text-xs text-muted-foreground">
-          {row.original.matched_at || "-"}
+        <span className="max-w-[120px] md:max-w-[180px] truncate font-mono text-xs text-muted-foreground block">
+          {row.original.templateId || "-"}
         </span>
       ),
     },
@@ -234,7 +259,7 @@ export default function VulnerabilitiesPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+    <div className="flex flex-col h-full gap-4 py-4 md:gap-6 md:py-6">
       <DataTable
         columns={columns}
         data={data}
@@ -244,7 +269,7 @@ export default function VulnerabilitiesPage() {
           onPageChange: setPage,
         }}
         toolbar={
-          <>
+          <div className="flex flex-wrap gap-2 items-center">
             <Select
               value={severityFilter || "all"}
               onValueChange={(v) => {
@@ -292,11 +317,20 @@ export default function VulnerabilitiesPage() {
               }}
             />
             <Input
-              placeholder="Filter host domain..."
-              className="h-8 w-36"
-              value={hostDomainFilter}
+              placeholder="Filter domain..."
+              className="h-8 w-32"
+              value={domainFilter}
               onChange={(e) => {
-                setHostDomainFilter(e.target.value)
+                setDomainFilter(e.target.value)
+                setPage(1)
+              }}
+            />
+            <Input
+              placeholder="Filter IP..."
+              className="h-8 w-28"
+              value={ipFilter}
+              onChange={(e) => {
+                setIpFilter(e.target.value)
                 setPage(1)
               }}
             />
@@ -306,7 +340,7 @@ export default function VulnerabilitiesPage() {
               accept=".json,.jsonl,.txt"
               onUpload={handleUpload}
             />
-          </>
+          </div>
         }
       />
     </div>

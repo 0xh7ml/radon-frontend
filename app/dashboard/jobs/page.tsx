@@ -444,20 +444,20 @@ export default function JobsPage() {
                     </div>
                     <div>
                       <span className="text-xs text-muted-foreground">Scan Type</span>
-                      <p className="text-sm">
+                      <div className="text-sm">
                         <Badge
                           variant="outline"
                           className={`text-xs ${getScanTypeBadge(selectedJob.scanType)}`}
                         >
                           {selectedJob.scanType}
                         </Badge>
-                      </p>
+                      </div>
                     </div>
                     <div>
                       <span className="text-xs text-muted-foreground">Status</span>
-                      <p className="text-sm">
+                      <div className="text-sm">
                         <JobStatusBadge status={selectedJob.status} />
-                      </p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
