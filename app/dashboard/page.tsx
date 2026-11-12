@@ -10,6 +10,7 @@ interface Stats {
   total_subdomains?: number
   total_ports?: number
   total_probed_hosts?: number
+  total_urls?: number
   total_vulnerabilities?: number
   vulnerability_breakdown?: {
     critical?: number
