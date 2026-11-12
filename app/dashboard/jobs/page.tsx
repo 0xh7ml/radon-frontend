@@ -235,7 +235,8 @@ export default function JobsPage() {
       subdomain: "bg-blue-500/15 text-blue-400 border-blue-500/30",
       port: "bg-green-500/15 text-green-400 border-green-500/30",
       probed: "bg-orange-500/15 text-orange-400 border-orange-500/30",
-      vulnerability: "bg-red-500/15 text-red-400 border-red-500/30",
+      vuln: "bg-red-500/15 text-red-400 border-red-500/30",
+      url: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
     }
     return colors[scanType] || colors.domain
   }
@@ -402,7 +403,8 @@ export default function JobsPage() {
                 <SelectItem value="subdomain">Subdomain</SelectItem>
                 <SelectItem value="port">Port</SelectItem>
                 <SelectItem value="probed">Probed</SelectItem>
-                <SelectItem value="vulnerability">Vulnerability</SelectItem>
+                <SelectItem value="url">URL</SelectItem>
+                <SelectItem value="vuln">Vulnerability</SelectItem>
               </SelectContent>
             </Select>
             <Button
