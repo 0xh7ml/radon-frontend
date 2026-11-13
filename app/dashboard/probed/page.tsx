@@ -96,7 +96,14 @@ const fetchProbed = async () => {
       
       // Handle different response structures
       const items = result.data || result.items || (Array.isArray(result) ? result : [])
-      setAllData(Array.isArray(items) ? items : [])
+      setAllData(
+        (Array.isArray(items) ? items : []).map((h: any) => ({
+          ...h,
+          input: String(h.input ?? ""),
+          domain: String(h.domain ?? ""),
+          tech: Array.isArray(h.tech) ? h.tech.map(String) : Array.isArray(h.tech?.tech) ? h.tech.tech.map(String) : undefined,
+        }))
+      )
     } catch (error: any) {
       console.error("Probed fetch error:", error)
       // Only show error toast if it's not a "no data" situation
