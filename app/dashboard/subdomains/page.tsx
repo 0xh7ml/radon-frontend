@@ -209,15 +209,6 @@ export default function SubdomainsPage() {
 
   const columns: ColumnDef<Subdomain>[] = [
     {
-      accessorKey: "id",
-      header: "ID",
-      cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {row.original.id}
-        </span>
-      ),
-    },
-    {
       accessorKey: "name",
       header: "Subdomain",
       cell: ({ row }) => (
@@ -282,6 +273,7 @@ export default function SubdomainsPage() {
         data={data}
         serverPagination={{
           page,
+          pageSize: itemsPerPage,
           totalPages,
           onPageChange: setPage,
         }}

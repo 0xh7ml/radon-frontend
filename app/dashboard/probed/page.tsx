@@ -312,6 +312,7 @@ const fetchProbed = async () => {
         data={data}
         serverPagination={{
           page,
+          pageSize: itemsPerPage,
           totalPages,
           onPageChange: setPage,
         }}

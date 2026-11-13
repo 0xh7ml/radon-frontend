@@ -105,6 +105,11 @@ export default function DomainsPage() {
   }, [])
 
   // Client-side filtering and pagination
+  // Any filter change goes back to page 1
+  React.useEffect(() => {
+    setPage(1)
+  }, [nameFilter, scannedFilter, dateOrder])
+
   const { data, totalPages } = React.useMemo(() => {
     let filtered = [...allData]
     
@@ -275,15 +280,6 @@ export default function DomainsPage() {
 
   const columns: ColumnDef<Domain>[] = [
     {
-      accessorKey: "id",
-      header: "ID",
-      cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {row.original.id}
-        </span>
-      ),
-    },
-    {
       accessorKey: "name",
       header: "Domain Name",
       cell: ({ row }) => (
@@ -357,6 +353,12 @@ export default function DomainsPage() {
       <DataTable
         columns={columns}
         data={data}
+        serverPagination={{
+          page,
+          totalPages: Math.max(1, totalPages),
+          pageSize: itemsPerPage,
+          onPageChange: setPage,
+        }}
         toolbar={
           <>
             <Input

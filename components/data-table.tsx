@@ -53,6 +53,7 @@ interface DataTableProps<TData, TValue> {
   serverPagination?: {
     page: number
     totalPages: number
+    pageSize?: number
     onPageChange: (page: number) => void
   }
   toolbar?: React.ReactNode
@@ -90,6 +91,13 @@ export function DataTable<TData, TValue>({
       : getPaginationRowModel(),
   })
 
+  // S/N = position in the displayed list (not the DB primary key), continuing across pages
+  const { pageIndex, pageSize: clientPageSize } = table.getState().pagination
+  const serialOffset = serverPagination
+    ? (serverPagination.page - 1) *
+      (serverPagination.pageSize ?? table.getRowModel().rows.length)
+    : pageIndex * clientPageSize
+
   return (
     <div className="flex flex-col gap-4 px-4 lg:px-6">
       <div className="flex items-center justify-between gap-2">
@@ -123,6 +131,7 @@ export function DataTable<TData, TValue>({
           <TableHeader className="bg-muted/50">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
+                <TableHead className="w-14">S/N</TableHead>
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id}>
                     {header.isPlaceholder
@@ -138,8 +147,11 @@ export function DataTable<TData, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
+              table.getRowModel().rows.map((row, i) => (
                 <TableRow key={row.id}>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {serialOffset + i + 1}
+                  </TableCell>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(
@@ -153,7 +165,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={columns.length + 1}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No results.
