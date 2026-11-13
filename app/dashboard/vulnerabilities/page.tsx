@@ -265,6 +265,7 @@ export default function VulnerabilitiesPage() {
         data={data}
         serverPagination={{
           page,
+          pageSize: itemsPerPage,
           totalPages,
           onPageChange: setPage,
         }}

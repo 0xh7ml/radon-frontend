@@ -196,6 +196,10 @@ export default function JobsPage() {
   }
 
   React.useEffect(() => {
+    setPage(1)
+  }, [statusFilter, scanTypeFilter])
+
+  React.useEffect(() => {
     fetchJobs(page)
   }, [page, statusFilter, scanTypeFilter])
 
@@ -366,6 +370,12 @@ export default function JobsPage() {
       <DataTable
         columns={columns}
         data={filteredJobs}
+        serverPagination={{
+          page,
+          totalPages: Math.max(1, pagination.totalPages),
+          pageSize: itemsPerPage,
+          onPageChange: setPage,
+        }}
         toolbar={
           <>
             <Input

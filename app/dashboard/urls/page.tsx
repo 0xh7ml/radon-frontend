@@ -153,6 +153,7 @@ export default function UrlsPage() {
         data={rows}
         serverPagination={{
           page,
+          pageSize: LIMIT,
           totalPages: pagination.totalPages,
           onPageChange: setPage,
         }}
