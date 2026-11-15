@@ -66,6 +66,9 @@ interface JobsApiResponse {
   }
 }
 
+// failed, or stuck mid-flight; backend rejects queued/completed (409)
+const canRetry = (status: string) => ["failed", "processing", "pending"].includes(status)
+
 export default function JobsPage() {
   const [jobs, setJobs] = React.useState<Job[]>([])
   const [pagination, setPagination] = React.useState({
@@ -157,14 +160,16 @@ export default function JobsPage() {
       })
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body.message || `HTTP error! status: ${response.status}`)
       }
       
       toast.success("Job retry initiated")
+      setSelectedJob(null)
       fetchJobs(page)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Retry job error:", error)
-      toast.error("Failed to retry job")
+      toast.error(error?.message || "Failed to retry job")
     }
   }
 
@@ -341,7 +346,7 @@ export default function JobsPage() {
             <IconEye className="h-4 w-4" />
             <span className="sr-only">View Details</span>
           </Button>
-          {row.original.status === "failed" && (
+          {canRetry(row.original.status) && (
             <Button
               variant="ghost"
               size="icon"
@@ -573,7 +578,7 @@ export default function JobsPage() {
                   <IconRefresh className="h-4 w-4 mr-2" />
                   Refresh Status
                 </Button>
-                {selectedJob.status === "failed" && (
+                {canRetry(selectedJob.status) && (
                   <Button
                     variant="default"
                     size="sm"
