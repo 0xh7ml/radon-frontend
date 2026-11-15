@@ -34,10 +34,35 @@ export default function PortsPage() {
   const [hostFilter, setHostFilter] = React.useState("")
   const [portFilter, setPortFilter] = React.useState("all")
 
+  const [domainOptions, setDomainOptions] = React.useState<string[]>([])
+  const [portOptions, setPortOptions] = React.useState<number[]>([])
+
+  const apiGet = async (path: string) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+    return fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}${path}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Options come from the whole table, not from the rows currently loaded
+  const fetchOptions = async () => {
+    try {
+      const res = await apiGet("/api/ports/filters")
+      if (!res.ok) return
+      const { data } = await res.json()
+      setDomainOptions(data?.domains ?? [])
+      setPortOptions(data?.ports ?? [])
+    } catch (e) {
+      console.error("Port filter options error:", e)
+    }
+  }
+
   const fetchPorts = async () => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ page: "1", limit: "1000" })
+      if (hostDomainFilter !== "all") params.set("domain", hostDomainFilter)
+      if (portFilter !== "all") params.set("port", portFilter)
       const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/ports?${params.toString()}`, {
         headers: {
@@ -46,6 +71,10 @@ export default function PortsPage() {
         }
       })
       
+      if (response.status === 404) {
+        setAllData([]) // empty result for this filter
+        return
+      }
       if (!response.ok) {
         if (response.status === 401) {
           if (typeof window !== "undefined") {
@@ -73,17 +102,16 @@ export default function PortsPage() {
   }
 
   React.useEffect(() => {
-    fetchPorts()
+    fetchOptions()
   }, [])
+
+  React.useEffect(() => {
+    fetchPorts()
+  }, [hostDomainFilter, portFilter])
 
   // Client-side filtering
   const data = React.useMemo(() => {
     let filtered = [...allData]
-    
-    // Filter by host domain (assuming host contains domain info)
-    if (hostDomainFilter !== "all") {
-      filtered = filtered.filter(port => port.domain === hostDomainFilter)
-    }
     
     // Filter by host
     if (hostFilter) {
@@ -92,22 +120,8 @@ export default function PortsPage() {
       )
     }
     
-    // Filter by port
-    if (portFilter !== "all") {
-      filtered = filtered.filter(port => String(port.port) === portFilter)
-    }
-    
     return filtered
-  }, [allData, hostDomainFilter, hostFilter, portFilter])
-
-  const domains = React.useMemo(
-    () => [...new Set(allData.map(p => p.domain).filter(Boolean))].sort(),
-    [allData]
-  )
-  const portNumbers = React.useMemo(
-    () => [...new Set(allData.map(p => p.port))].sort((a, b) => a - b),
-    [allData]
-  )
+  }, [allData, hostFilter])
 
   const handleUpload = async (file: File) => {
     const formData = new FormData()
@@ -201,7 +215,7 @@ export default function PortsPage() {
     },
   ]
 
-  if (isLoading) {
+  if (isLoading && allData.length === 0 && domainOptions.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center py-20">
         <IconLoader2 className="h-8 w-8 animate-spin text-primary" />
@@ -222,7 +236,7 @@ export default function PortsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All domains</SelectItem>
-                {domains.map(d => (
+                {domainOptions.map(d => (
                   <SelectItem key={d} value={d}>{d}</SelectItem>
                 ))}
               </SelectContent>
@@ -239,7 +253,7 @@ export default function PortsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All ports</SelectItem>
-                {portNumbers.map(n => (
+                {portOptions.map(n => (
                   <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                 ))}
               </SelectContent>

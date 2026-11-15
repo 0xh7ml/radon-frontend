@@ -67,10 +67,30 @@ export default function ProbedPage() {
   const [inputFilter, setInputFilter] = React.useState("")
   const [inputDomainFilter, setInputDomainFilter] = React.useState("")
 
-const fetchProbed = async () => {
+const [opts, setOpts] = React.useState<{ domains: string[]; statusCodes: number[]; techs: string[] }>({ domains: [], statusCodes: [], techs: [] })
+
+  // Options come from the whole table, not from the rows currently loaded
+  const fetchOptions = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/probed/filters`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      })
+      if (!res.ok) return
+      const { data } = await res.json()
+      setOpts({ domains: data?.domains ?? [], statusCodes: data?.statusCodes ?? [], techs: data?.techs ?? [] })
+    } catch (e) {
+      console.error("Probed filter options error:", e)
+    }
+  }
+
+  const fetchProbed = async () => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ page: "1", limit: "1000" })
+      if (statusFilter) params.set("status_code", statusFilter)
+      if (inputDomainFilter) params.set("domain", inputDomainFilter)
+      if (techFilter) params.set("tech", techFilter)
       const token = typeof window !== "undefined" ? localStorage.getItem('jwt_token') : null
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787"}/api/probed?${params.toString()}`, {
         headers: {
@@ -79,6 +99,10 @@ const fetchProbed = async () => {
         }
       })
       
+      if (response.status === 404) {
+        setAllData([]) // empty result for this filter
+        return
+      }
       if (!response.ok) {
         if (response.status === 401) {
           if (typeof window !== "undefined") {
@@ -116,28 +140,20 @@ const fetchProbed = async () => {
   }
 
   React.useEffect(() => {
-    fetchProbed()
+    fetchOptions()
   }, [])
+
+  React.useEffect(() => {
+    fetchProbed()
+  }, [statusFilter, inputDomainFilter, techFilter])
 
   // Client-side filtering and pagination
   const { data, totalPages } = React.useMemo(() => {
     let filtered = [...allData]
     
     // Apply filters
-    if (statusFilter) {
-      filtered = filtered.filter(host => 
-        String(host.statusCode) === statusFilter
-      )
-    }
-    
     if (schemeFilter && schemeFilter !== "all") {
       filtered = filtered.filter(host => host.scheme === schemeFilter)
-    }
-    
-    if (techFilter) {
-      filtered = filtered.filter(host => 
-        host.tech?.includes(techFilter)
-      )
     }
     
     if (webserverFilter) {
@@ -170,32 +186,14 @@ const fetchProbed = async () => {
       )
     }
     
-    if (inputDomainFilter) {
-      filtered = filtered.filter(host => 
-        host.domain === inputDomainFilter
-      )
-    }
-    
     // Pagination
     const totalPages = Math.ceil(filtered.length / itemsPerPage)
     const startIndex = (page - 1) * itemsPerPage
     const paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage)
     
     return { data: paginatedData, totalPages }
-  }, [allData, statusFilter, schemeFilter, techFilter, webserverFilter, titleFilter, cdnNameFilter, cdnTypeFilter, inputFilter, inputDomainFilter, page, itemsPerPage])
+  }, [allData, schemeFilter, webserverFilter, titleFilter, cdnNameFilter, cdnTypeFilter, inputFilter, page, itemsPerPage])
 
-  const statusCodes = React.useMemo(
-    () => [...new Set(allData.map(h => h.statusCode))].sort((a, b) => a - b),
-    [allData]
-  )
-  const domains = React.useMemo(
-    () => [...new Set(allData.map(h => h.domain).filter(Boolean))].sort(),
-    [allData]
-  )
-  const techs = React.useMemo(
-    () => [...new Set(allData.flatMap(h => h.tech ?? []))].sort(),
-    [allData]
-  )
   const renderSelect = (
     label: string,
     value: string,
@@ -342,7 +340,7 @@ const fetchProbed = async () => {
     },
   ]
 
-  if (isLoading && data.length === 0) {
+  if (isLoading && allData.length === 0 && opts.domains.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center py-20">
         <IconLoader2 className="h-8 w-8 animate-spin text-primary" />
@@ -372,7 +370,7 @@ const fetchProbed = async () => {
                 setPage(1)
               }}
             />
-            {renderSelect("Status", statusFilter, setStatusFilter, statusCodes.map(String), "w-32")}
+            {renderSelect("Status", statusFilter, setStatusFilter, opts.statusCodes.map(String), "w-32")}
             <Select
               value={schemeFilter || "all"}
               onValueChange={(v) => {
@@ -389,8 +387,8 @@ const fetchProbed = async () => {
                 <SelectItem value="http">HTTP</SelectItem>
               </SelectContent>
             </Select>
-            {renderSelect("Domains", inputDomainFilter, setInputDomainFilter, domains, "w-44")}
-            {renderSelect("Tech", techFilter, setTechFilter, techs, "w-40")}
+            {renderSelect("Domains", inputDomainFilter, setInputDomainFilter, opts.domains, "w-44")}
+            {renderSelect("Tech", techFilter, setTechFilter, opts.techs, "w-40")}
             <Input
               placeholder="Filter webserver..."
               className="h-8 w-36"
