@@ -20,6 +20,7 @@ import { FileUploadDialog } from "@/components/file-upload-dialog"
 interface Port {
   id: number
   host: string
+  domain: string
   ip: string
   port: number
   protocol: string
@@ -29,9 +30,9 @@ interface Port {
 export default function PortsPage() {
   const [allData, setAllData] = React.useState<Port[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
-  const [hostDomainFilter, setHostDomainFilter] = React.useState("")
+  const [hostDomainFilter, setHostDomainFilter] = React.useState("all")
   const [hostFilter, setHostFilter] = React.useState("")
-  const [portFilter, setPortFilter] = React.useState("")
+  const [portFilter, setPortFilter] = React.useState("all")
 
   const fetchPorts = async () => {
     setIsLoading(true)
@@ -80,10 +81,8 @@ export default function PortsPage() {
     let filtered = [...allData]
     
     // Filter by host domain (assuming host contains domain info)
-    if (hostDomainFilter) {
-      filtered = filtered.filter(port => 
-        port.host.toLowerCase().includes(hostDomainFilter.toLowerCase())
-      )
+    if (hostDomainFilter !== "all") {
+      filtered = filtered.filter(port => port.domain === hostDomainFilter)
     }
     
     // Filter by host
@@ -94,14 +93,21 @@ export default function PortsPage() {
     }
     
     // Filter by port
-    if (portFilter) {
-      filtered = filtered.filter(port => 
-        String(port.port).includes(portFilter)
-      )
+    if (portFilter !== "all") {
+      filtered = filtered.filter(port => String(port.port) === portFilter)
     }
     
     return filtered
   }, [allData, hostDomainFilter, hostFilter, portFilter])
+
+  const domains = React.useMemo(
+    () => [...new Set(allData.map(p => p.domain).filter(Boolean))].sort(),
+    [allData]
+  )
+  const portNumbers = React.useMemo(
+    () => [...new Set(allData.map(p => p.port))].sort((a, b) => a - b),
+    [allData]
+  )
 
   const handleUpload = async (file: File) => {
     const formData = new FormData()
@@ -210,24 +216,34 @@ export default function PortsPage() {
         data={data}
         toolbar={
           <>
-            <Input
-              placeholder="Filter by domain..."
-              className="h-8 w-44"
-              value={hostDomainFilter}
-              onChange={(e) => setHostDomainFilter(e.target.value)}
-            />
+            <Select value={hostDomainFilter} onValueChange={setHostDomainFilter}>
+              <SelectTrigger className="h-8 w-44">
+                <SelectValue placeholder="Domain" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All domains</SelectItem>
+                {domains.map(d => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               placeholder="Filter by host..."
               className="h-8 w-40"
               value={hostFilter}
               onChange={(e) => setHostFilter(e.target.value)}
             />
-            <Input
-              placeholder="Filter by port..."
-              className="h-8 w-32"
-              value={portFilter}
-              onChange={(e) => setPortFilter(e.target.value)}
-            />
+            <Select value={portFilter} onValueChange={setPortFilter}>
+              <SelectTrigger className="h-8 w-32">
+                <SelectValue placeholder="Port" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All ports</SelectItem>
+                {portNumbers.map(n => (
+                  <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <FileUploadDialog
               title="Upload Ports"
               description={`Upload an NDJSON file (naabu output).
