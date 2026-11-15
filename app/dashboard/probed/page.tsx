@@ -126,7 +126,7 @@ const fetchProbed = async () => {
     // Apply filters
     if (statusFilter) {
       filtered = filtered.filter(host => 
-        String(host.statusCode).includes(statusFilter)
+        String(host.statusCode) === statusFilter
       )
     }
     
@@ -136,7 +136,7 @@ const fetchProbed = async () => {
     
     if (techFilter) {
       filtered = filtered.filter(host => 
-        host.tech?.some(tech => tech.toLowerCase().includes(techFilter.toLowerCase()))
+        host.tech?.includes(techFilter)
       )
     }
     
@@ -172,7 +172,7 @@ const fetchProbed = async () => {
     
     if (inputDomainFilter) {
       filtered = filtered.filter(host => 
-        host.domain.toLowerCase().includes(inputDomainFilter.toLowerCase())
+        host.domain === inputDomainFilter
       )
     }
     
@@ -183,6 +183,44 @@ const fetchProbed = async () => {
     
     return { data: paginatedData, totalPages }
   }, [allData, statusFilter, schemeFilter, techFilter, webserverFilter, titleFilter, cdnNameFilter, cdnTypeFilter, inputFilter, inputDomainFilter, page, itemsPerPage])
+
+  const statusCodes = React.useMemo(
+    () => [...new Set(allData.map(h => h.statusCode))].sort((a, b) => a - b),
+    [allData]
+  )
+  const domains = React.useMemo(
+    () => [...new Set(allData.map(h => h.domain).filter(Boolean))].sort(),
+    [allData]
+  )
+  const techs = React.useMemo(
+    () => [...new Set(allData.flatMap(h => h.tech ?? []))].sort(),
+    [allData]
+  )
+  const renderSelect = (
+    label: string,
+    value: string,
+    set: (v: string) => void,
+    options: string[],
+    width: string
+  ) => (
+    <Select
+      value={value || "all"}
+      onValueChange={(v) => {
+        set(v === "all" ? "" : v)
+        setPage(1)
+      }}
+    >
+      <SelectTrigger className={`h-8 ${width}`}>
+        <SelectValue placeholder={label} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All {label}</SelectItem>
+        {options.map(o => (
+          <SelectItem key={o} value={o}>{o}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 
   const handleUpload = async (file: File) => {
     const formData = new FormData()
@@ -334,15 +372,7 @@ const fetchProbed = async () => {
                 setPage(1)
               }}
             />
-            <Input
-              placeholder="Filter status code..."
-              className="h-8 w-32"
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value)
-                setPage(1)
-              }}
-            />
+            {renderSelect("Status", statusFilter, setStatusFilter, statusCodes.map(String), "w-32")}
             <Select
               value={schemeFilter || "all"}
               onValueChange={(v) => {
@@ -359,15 +389,8 @@ const fetchProbed = async () => {
                 <SelectItem value="http">HTTP</SelectItem>
               </SelectContent>
             </Select>
-            <Input
-              placeholder="Filter by domain..."
-              className="h-8 w-36"
-              value={inputDomainFilter}
-              onChange={(e) => {
-                setInputDomainFilter(e.target.value)
-                setPage(1)
-              }}
-            />
+            {renderSelect("Domains", inputDomainFilter, setInputDomainFilter, domains, "w-44")}
+            {renderSelect("Tech", techFilter, setTechFilter, techs, "w-40")}
             <Input
               placeholder="Filter webserver..."
               className="h-8 w-36"
